@@ -3,14 +3,36 @@
 <head>
     <title>Fancy gradle deps</title>
     <link rel="stylesheet" type="text/css" href="deps.css">
+    <script type="text/javascript" src="deps.js"></script>
+    <script type="text/javascript" src="vue.min.js"></script>
 </head>
 
 <body>
     <input id="select-file" type="file" value="select a deps file" />
     <div id="container">
-
+        <table v-if="exp.length > 0">
+            <tr>
+                <th>group</th>
+                <th>id</th>
+                <th>version</th>
+                <th>original version</th>
+                <th>module</th>
+            </tr>
+            <tr v-for="dep in exp" class="exp">
+                <td>{{ dep.group }}</td>
+                <td>{{ dep.artifact }}</td>
+                <td>{{ dep.actualVersion }}</td>
+                <td v-bind:class="{replaced : dep.versionReplaced}">{{ dep.originalVersion }}</td>
+                <td>{{ dep.parent.artifact }}</td>
+            </tr>
+            <tr v-for="dep in imp" class="imp">
+                <td>{{ dep.group }}</td>
+                <td>{{ dep.artifact }}</td>
+                <td>{{ dep.actualVersion }}</td>
+                <td v-bind:class="{replaced : dep.versionReplaced}">{{ dep.originalVersion }}</td>
+            </tr>
+        </table>
     </div>
-    <script type="text/javascript" src="deps.js"></script>
 </body>
 
 </html>

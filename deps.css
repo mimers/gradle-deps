@@ -8,11 +8,24 @@
     cursor: none
 }
 
-#root:active{
-	cursor: move;
+#root:active {
+    cursor: move;
 }
 
 body {
-    background-image: -webkit-linear-gradient(top,#B69191,#FBB040);
+    background-image: -webkit-linear-gradient(top, #B69191, #FBB040);
     user-select: none;
+    font-family: monospace;
+}
+
+tr.exp {
+    background-color: rgba(180, 245, 180, 0.5);
+}
+
+tr.imp {
+    background-color: rgba(255, 232, 146, 0.56);
+}
+
+td.replaced {
+    background-color: rgba(243, 87, 87, 0.7);
 }
