@@ -1,7 +1,14 @@
+var OMMITTED_POSTFIX = ' (*)';
+var TASK_POSTFIX = ' - ## Internal use, do not manually configure ##';
+
+
 class TaskDeps {
-    constructor(name) {
+    constructor(name, projectName) {
         this.name = name;
         this.deps = [];
+        if (projectName) {
+            this.artifact = projectName;
+        }
     }
 
     add(dep) {
@@ -23,6 +30,10 @@ class DepNode {
             this.group = d[0]
             this.artifact = d[1];
             var version = d[2];
+            if (version.endsWith(OMMITTED_POSTFIX)) {
+                this.ommitted = true;
+                version = version.substr(0, version.length - OMMITTED_POSTFIX.length);
+            }
             var v = version.split(' -> ');
             if (v.length == 2) {
                 this.originalVersion = v[0];
@@ -32,15 +43,15 @@ class DepNode {
                 this.originalVersion = version;
                 this.actualVersion = version;
             }
-            if (this.actualVersion.indexOf(' (*)') > 0) {
-                this.ommitted = true;
-                this.actualVersion = this.actualVersion.split(' ')[0];
-            }
         }
     }
 
     equals(o) {
         return this.group == o.group && this.artifact == o.artifact && this.actualVersion == o.actualVersion;
+    }
+
+    equalsIgnoreVersion(o) {
+        return this.group == o.group && this.artifact == o.artifact;
     }
 
     add(node) {
@@ -95,10 +106,10 @@ function parseDepNodeTree(parent, lines, depth, startIndex) {
     }
 }
 
-function getDepHierachy(tasks) {
+function getDepHierachy(tasks, projectName) {
     var ths = [];
     tasks.forEach((t) => {
-        var task = new TaskDeps(t.name);
+        var task = new TaskDeps(t.name, projectName);
         parseDepNodeTree(task, t.deps, 0, 0);
         ths.push(task);
     });
@@ -110,8 +121,18 @@ function getTaskDeps(depsContent) {
     var lines = depsContent.split('\n');
     var tasks = [];
     var hitTaskStartLine = false;
-    var TASK_POSTFIX = ' - ## Internal use, do not manually configure ##';
     var t;
+    var projectName;
+    var projectLine = lines.find((line, index) => {
+        if (line.startsWith('Project :') &&
+            index > 0 && lines[index - 1].startsWith('-------') &&
+            index < lines.length - 1 && lines[index + 1].startsWith('-------')) {
+            return true;
+        }
+    });
+    if (projectLine) {
+        projectName = projectLine.substr('Project :'.length);
+    }
     lines.forEach((line) => {
         line = line.trim();
         if (!hitTaskStartLine) {
@@ -132,7 +153,7 @@ function getTaskDeps(depsContent) {
         }
     });
 
-    return getDepHierachy(tasks);
+    return getDepHierachy(tasks, projectName);
 }
 
 
@@ -157,14 +178,45 @@ function getFlattenedDeps(nodes, exp, imp) {
     });
 }
 
+function findSameNodes(node, deps) {
+    var sameDeps = [];
+    deps.forEach((dep) => {
+        if (dep != node && dep.equalsIgnoreVersion(node)) {
+            sameDeps.push(dep);
+        } else if (dep.children) {
+            sameDeps = sameDeps.concat(findSameNodes(node, dep.children));
+        }
+    });
+    return sameDeps;
+}
+
 function getDepsList(task) {
     var explicitly = [];
     var implicitly = [];
     console.log('processing task', task.name);
     getFlattenedDeps(task.deps, explicitly, implicitly);
-    explicitly = explicitly.filter((dep) => !dep.isLibraryModule).sort(DepNodeCompartor)
+    explicitly = explicitly.filter((dep) => !dep.isLibraryModule).sort(DepNodeCompartor);
     implicitly = implicitly.filter((dep) => !dep.isLibraryModule).sort(DepNodeCompartor);
     console.log(explicitly, implicitly);
+    var expWarning = explicitly.filter((n) => n.versionReplaced);
+    vue.warn = expWarning.map((node) => {
+        return {
+            node: node,
+            sameDepChains: findSameNodes(node, task.deps).map((node) => {
+                var chain = [node];
+                while (node.parent) {
+                    if (node.isLibraryModule) {
+                        break;
+                    } else {
+                        chain.push(node.parent);
+                        node = node.parent;
+                    }
+
+                }
+                return chain;
+            })
+        };
+    });
     vue.exp = explicitly;
     vue.imp = implicitly;
 }
@@ -179,7 +231,6 @@ function handleFiles(files) {
                 var tasks = getTaskDeps(e.target.result);
                 var release = getFirstReleaseApkTaskDeps(tasks);
                 var result = getDepsList(release);
-                // console.log('valid tasks', JSON.stringify(tasks[2], 0, 2));
             }
         })(f);
         reader.readAsText(f);
@@ -212,7 +263,8 @@ document.addEventListener('DOMContentLoaded', () => {
         el: '#container',
         data: {
             exp: [],
-            imp: []
+            imp: [],
+            showImp: false
         }
     });
 })
