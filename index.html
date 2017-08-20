@@ -19,7 +19,7 @@
                 <th>original version</th>
                 <th>module</th>
             </tr>
-            <tr v-for="dep in exp" class="exp">
+            <tr v-for="(dep, index) in exp" class="exp" v-bind:class="{ replaced: dep.versionReplaced && dep.sameDepChains }" v-on:click="dep.sameDepChains ? expandExp(index) : ''">
                 <td>{{ dep.group }}</td>
                 <td>{{ dep.artifact }}</td>
                 <td>{{ dep.actualVersion }}</td>
@@ -29,32 +29,48 @@
             <tr>
                 <td colspan="5" id="imp-switch" v-on:click="showImp = !showImp">{{ (showImp ? '收起' : '展开') + '间接依赖项' }}</td>
             </tr>
-            <tr v-if="showImp" v-for="dep in imp" class="imp">
+            <tr v-if="showImp" v-for="(dep, index) in imp" class="imp" v-on:click="expandImp(index)">
                 <td>{{ dep.group }}</td>
                 <td>{{ dep.artifact }}</td>
                 <td>{{ dep.actualVersion }}</td>
-                <td v-bind:class="{replaced : dep.versionReplaced}">{{ dep.originalVersion }}</td>
+                <td class="replaced">{{ dep.versionReplaced ? dep.originalVersion : '' }}</td>
             </tr>
             <tr>
                 <td colspan="5">被替换版本的显式依赖列表</td>
             </tr>
             <tr v-for="w in warn">
-                <td v-if="w.sameDepChains.length > 0" colspan="5">
+                <td v-if="w.sameDepChains && w.sameDepChains.length > 0" colspan="5">
                     <div class="warn-dep">
-                        <div class="warn-title">被替换版本的依赖项：{{ w.node.group + ':' + w.node.artifact + ':' + w.node.originalVersion + ' -> ' + w.node.actualVersion }}</div>
+                        <div class="warn-title">被替换版本的依赖项：{{ w.group + ':' + w.artifact + ':' + w.originalVersion + ' -> ' + w.actualVersion }}</div>
                         <div>
                             <span>其他依赖关系：</span>
-                            <ul class="dep-chain" v-for="chain in w.sameDepChains" v-bind:class="{'actual-upgrade': w.node.actualVersion == chain[0].originalVersion, 'auto-upgrade' : w.node.originalVersion != chain[0].originalVersion }">
+                            <ul class="dep-chain" v-for="chain in w.sameDepChains" v-bind:class="{'actual-upgrade': w != chain[0] && w.actualVersion == chain[0].originalVersion, 'auto-upgrade' : w.originalVersion != chain[0].originalVersion }">
                                 <li v-for="node in chain">
                                     {{ (node.group ? (node.group + ':') : '') + node.artifact + (node.originalVersion ? (':' + node.originalVersion) : '') }}
                                 </li>
-                            </ol>
+                                </ol>
                         </div>
                     </div>
                 </td>
             </tr>
         </table>
-
+        <transition name="slide-fade">
+            <div v-on:click="closeDialog" class="fullscreen-modal-dialog" v-if="dialogDep">
+                <content>
+                    <div class="warn-dep" v-if="dialogDep">
+                        <div class="warn-title">{{ dialogDep.group + ':' + dialogDep.artifact + ':' + dialogDep.originalVersion + (dialogDep.versionReplaced ? (' -> ' + dialogDep.actualVersion) : '') }}</div>
+                        <div>
+                            <span>其他依赖关系：</span>
+                            <ul class="dep-chain" v-for="chain in dialogDep.sameDepChains" v-bind:class="{'actual-upgrade': dialogDep.versionReplaced && dialogDep.actualVersion == chain[0].originalVersion, 'auto-upgrade' : dialogDep.originalVersion != chain[0].originalVersion }">
+                                <li v-for="node in chain">
+                                    {{ (node.group ? (node.group + ':') : '') + node.artifact + (node.originalVersion ? (':' + node.originalVersion) : '') }}
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </content>
+            </div>
+        </transition>
     </div>
 </body>
 

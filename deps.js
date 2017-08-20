@@ -190,20 +190,16 @@ function findSameNodes(node, deps) {
     return sameDeps;
 }
 
-function getDepsList(task) {
-    var explicitly = [];
-    var implicitly = [];
-    console.log('processing task', task.name);
-    getFlattenedDeps(task.deps, explicitly, implicitly);
-    explicitly = explicitly.filter((dep) => !dep.isLibraryModule).sort(DepNodeCompartor);
-    implicitly = implicitly.filter((dep) => !dep.isLibraryModule).sort(DepNodeCompartor);
-    console.log(explicitly, implicitly);
-    var expWarning = explicitly.filter((n) => n.versionReplaced);
-    vue.warn = expWarning.map((node) => {
-        return {
-            node: node,
-            sameDepChains: findSameNodes(node, task.deps).map((node) => {
+function formatDeps(deps, task, imp) {
+    return deps.filter((dep) => !dep.isLibraryModule).sort(DepNodeCompartor).map((dep) => {
+        if (dep.versionReplaced || imp) {
+            var sameNodes = findSameNodes(dep, task.deps);
+            if (imp) {
+                sameNodes.push(dep);
+            }
+            dep.sameDepChains = sameNodes.map((node) => {
                 var chain = [node];
+
                 while (node.parent) {
                     if (node.isLibraryModule) {
                         break;
@@ -214,9 +210,37 @@ function getDepsList(task) {
 
                 }
                 return chain;
-            })
-        };
+            }).sort((chainb, chaina) => {
+                var actualReplaceA = chaina[0].originalVersion == dep.actualVersion;
+                var autoUpgradeA = chaina[0].originalVersion != dep.originalVersion;
+
+                var actualReplaceB = chainb[0].originalVersion == dep.actualVersion;
+                var autoUpgradeB = chainb[0].originalVersion != dep.originalVersion;
+
+                var valueA = (actualReplaceA ? 10000 : 0) + (autoUpgradeA ? 1000 : 0) + chaina.length;
+                var valueB = (actualReplaceB ? 10000 : 0) + (autoUpgradeB ? 1000 : 0) + chainb.length;
+                return valueA - valueB;
+            });
+            if (dep.sameDepChains.length == 0) {
+                dep.sameDepChains = false;
+            }
+        } else {
+            dep.sameDepChains = undefined;
+        }
+        dep.showSameChains = false;
+        return dep;
     });
+}
+
+function getDepsList(task) {
+    var explicitly = [];
+    var implicitly = [];
+    console.log('processing task', task.name);
+    getFlattenedDeps(task.deps, explicitly, implicitly);
+    explicitly = formatDeps(explicitly, task);
+    implicitly = formatDeps(implicitly, task, true);
+    console.log(explicitly, implicitly);
+    vue.warn = explicitly.filter((n) => n.versionReplaced);
     vue.exp = explicitly;
     vue.imp = implicitly;
 }
@@ -264,7 +288,22 @@ document.addEventListener('DOMContentLoaded', () => {
         data: {
             exp: [],
             imp: [],
-            showImp: false
+            showImp: false,
+            dialogDep: false
+        },
+        methods: {
+            expandImp: function (index) {
+                this.dialogDep = this.imp[index];
+            },
+            expandExp: function (index) {
+                this.dialogDep = this.exp[index];
+            },
+            closeDialog: function (e) {
+                if (!e.target.className.includes("fullscreen-modal-dialog")) {
+                    return;
+                }
+                this.dialogDep = false;
+            }
         }
     });
 })
