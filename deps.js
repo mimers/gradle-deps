@@ -136,8 +136,9 @@ function getTaskDeps(depsContent) {
     lines.forEach((line) => {
         line = line.trim();
         if (!hitTaskStartLine) {
-            if (line.endsWith(TASK_POSTFIX)) {
-                t = new TaskDeps(line.substr(0, line.length - TASK_POSTFIX.length));
+            var regMatch = line.match(/(\w+) - .+\.$/);
+            if (regMatch) {
+            t = new TaskDeps(regMatch[1]);
                 hitTaskStartLine = true;
                 tasks.push(t);
             }
@@ -159,6 +160,10 @@ function getTaskDeps(depsContent) {
 
 function getFirstReleaseApkTaskDeps(tasks) {
     return tasks.find((t) => t.name.endsWith('eleaseApk'));
+}
+
+function getFirstCompileTaskDeps(tasks) {
+    return tasks.find((t) => t.name == 'compile')
 }
 
 function getFlattenedDeps(nodes, exp, imp) {
@@ -254,6 +259,9 @@ function handleFiles(files) {
                 document.title = "Editing " + theFile.name;
                 var tasks = getTaskDeps(e.target.result);
                 var release = getFirstReleaseApkTaskDeps(tasks);
+                if (!release) {
+                    release = getFirstCompileTaskDeps(tasks);
+                }
                 var result = getDepsList(release);
             }
         })(f);
