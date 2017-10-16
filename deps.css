@@ -14,7 +14,7 @@
 
 body {
     background-image: -webkit-linear-gradient(left, rgba(0, 243, 255, 0.3), rgba(255, 153, 0, 0.3));
-    /* user-select: none; */
+    /* margin: 0; */
     font-family: monospace;
 }
 
@@ -25,8 +25,9 @@ div.deps-title {
 }
 
 table {
-    margin: 0 auto;
+    margin: 0 28px;
     border-collapse: collapse;
+    /* width: 80%; */
 }
 
 td {
@@ -146,4 +147,27 @@ content {
 .slide-fade-leave-to {
     transform: translateY(10%);
     opacity: 0;
+}
+
+input[type='file'] {
+    position: absolute;
+    width: 0;
+    height: 0;
+    z-index: -1;
+    opacity: 0;
+}
+
+label.file-label {
+    color: #ffc31b;
+    border: #ffc31b solid 1.5px;
+    padding: 4px 12px;
+    margin: 1px;
+    fill: currentColor;
+    display: inline-block;
+    vertical-align: middle;
+    font-size: 0.9015rem;
+}
+
+label.file-label:hover {
+    cursor: pointer;
 }

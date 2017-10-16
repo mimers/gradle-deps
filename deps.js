@@ -44,6 +44,7 @@ class DepNode {
                 this.actualVersion = version;
             }
         }
+        this.explicity = (this.parent == null || this.parent instanceof TaskDeps || this.parent.isLibraryModule);
     }
 
     equals(o) {
@@ -63,15 +64,43 @@ class DepNode {
 }
 
 function DepNodeCompartor(a, b) {
-    if (a.group == b.group) {
-        if (a.artifact == b.artifact) {
-            return 0;
-        } else {
-            return a.artifact > b.artifact ? 1 : -1;
-        }
-    } else {
-        return a.group > b.group ? 1 : -1;
+    var rst = 0;
+    if (a.explicity) {
+        rst -= 1000;
     }
+    if (b.explicity) {
+        rst += 1000;
+    }
+    if (a.group > b.group) {
+        rst += 100;
+    } else if (a.group < b.group) {
+        rst -= 100;
+    }
+    if (a.artifact > b.artifact) {
+        rst += 10;
+    } else if (a.artifact < b.artifact) {
+        rst -= 10;
+    }
+    return rst;
+
+    // if (a.explicity) {
+    //     if (!b.explicity) {
+    //         return 1;
+    //     }
+    // } else {
+    //     if (b.explicity) {
+    //         return -1;
+    //     }
+    // }
+    // if (a.group == b.group) {
+    //     if (a.artifact == b.artifact) {
+    //         return 0;
+    //     } else {
+    //         return a.artifact > b.artifact ? 1 : -1;
+    //     }
+    // } else {
+    //     return a.group > b.group ? 1 : -1;
+    // }
 }
 
 function uniqFilter(value, index, self) {
@@ -91,9 +120,8 @@ function parseDepNodeTree(parent, lines, depth, startIndex) {
     for (var i = startIndex; i < lines.length;) {
         var line = lines[i];
         if (isSameLevel(line, prefixLength)) {
-            lastNodeInCurrentLevel = new DepNode(line.substr(prefixLength + DEPTH_OFFSET));
+            lastNodeInCurrentLevel = new DepNode(line.substr(prefixLength + DEPTH_OFFSET), parent);
             parent.add(lastNodeInCurrentLevel);
-            lastNodeInCurrentLevel.parent = parent;
             i++;
         } else {
             if (isSameLevel(line, prefixLength + DEPTH_OFFSET)) {
@@ -161,19 +189,16 @@ function getFirstReleaseApkTaskDeps(tasks) {
     return tasks.find((t) => t.name.endsWith('eleaseApk'));
 }
 
-function getFlattenedDeps(nodes, exp, imp) {
-    nodes.filter((node) => !node.ommitted).forEach((node) => {
-        if (node.parent instanceof DepNode && !node.parent.isLibraryModule) {
-            if (!imp.find((d) => node.equals(d))) {
-                imp.push(node);
-            }
-        } else {
-            if (!exp.find((d) => node.equals(d))) {
-                exp.push(node);
-            }
+function getFlattenedDeps(nodes, deps) {
+    nodes
+    // .filter((node) => !node.ommitted)
+    .forEach((node) => {
+
+        if (!deps.find((d) => node.equals(d))) {
+            deps.push(node);
         }
         if (node.children) {
-            getFlattenedDeps(node.children, exp, imp);
+            getFlattenedDeps(node.children, deps);
         }
     });
 }
@@ -190,8 +215,9 @@ function findSameNodes(node, deps) {
     return sameDeps;
 }
 
-function formatDeps(deps, task, imp) {
+function formatDeps(deps, task) {
     return deps.filter((dep) => !dep.isLibraryModule).sort(DepNodeCompartor).map((dep) => {
+        var imp = !dep.explicity;
         if (dep.versionReplaced || imp) {
             var sameNodes = findSameNodes(dep, task.deps);
             if (imp) {
@@ -233,28 +259,26 @@ function formatDeps(deps, task, imp) {
 }
 
 function getDepsList(task) {
-    var explicitly = [];
-    var implicitly = [];
-    console.log('processing task', task.name);
-    getFlattenedDeps(task.deps, explicitly, implicitly);
-    explicitly = formatDeps(explicitly, task);
-    implicitly = formatDeps(implicitly, task, true);
-    console.log(explicitly, implicitly);
-    vue.warn = explicitly.filter((n) => n.versionReplaced);
-    vue.exp = explicitly;
-    vue.imp = implicitly;
+    var flattenedDeps = [];
+    console.profile(task.name);
+    getFlattenedDeps(task.deps, flattenedDeps);
+    flattenedDeps = formatDeps(flattenedDeps, task);
+    vue.warn = flattenedDeps.filter((n) => n.versionReplaced);
+    vue.deps = flattenedDeps;
+    console.profileEnd(task.name);
 }
 
-function handleFiles(files) {
+function handleFiles(files, secondFile) {
     for (var i = 0; i < files.length; i++) {
         var f = files[i];
         var reader = new FileReader();
         reader.onload = (function(theFile) {
             return function(e) {
-                document.title = "Editing " + theFile.name;
+                console.profile(theFile.name);
                 var tasks = getTaskDeps(e.target.result);
                 var release = getFirstReleaseApkTaskDeps(tasks);
-                var result = getDepsList(release);
+                getDepsList(release);
+                console.profileEnd(theFile.name);
             }
         })(f);
         reader.readAsText(f);
@@ -264,6 +288,10 @@ function handleFiles(files) {
 
 function handleSelectFile(event) {
     handleFiles(event.target.files);
+}
+
+function handleSelectFile2(event) {
+    handleFiles(event.target.files, true);
 }
 
 function handleDragOver(event) {
@@ -281,24 +309,25 @@ function handleDrop(event) {
 document.addEventListener('DOMContentLoaded', () => {
     var select_file = document.getElementById('select-file');
     select_file.addEventListener("change", handleSelectFile, false);
+    var select_file2 = document.getElementById('select-file2');
+    select_file2.addEventListener("change", handleSelectFile2, false);
     document.body.addEventListener("drop", handleDrop, false);
     document.body.addEventListener("dragover", handleDragOver, false);
     vue = new Vue({
         el: '#container',
         data: {
-            exp: [],
-            imp: [],
-            showImp: false,
+            deps: [],
+            showImp: true,
             dialogDep: false
         },
         methods: {
-            expandImp: function (index) {
-                this.dialogDep = this.imp[index];
+            expandDep: function(index) {
+                var curDep = this.deps[index];
+                if (!curDep.explicity || (curDep.sameDepChains && curDep.versionReplaced)) {
+                    this.dialogDep = curDep;
+                }
             },
-            expandExp: function (index) {
-                this.dialogDep = this.exp[index];
-            },
-            closeDialog: function (e) {
+            closeDialog: function(e) {
                 if (!e.target.className.includes("fullscreen-modal-dialog")) {
                     return;
                 }
