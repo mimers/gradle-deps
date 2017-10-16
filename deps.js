@@ -164,8 +164,9 @@ function getTaskDeps(depsContent) {
     lines.forEach((line) => {
         line = line.trim();
         if (!hitTaskStartLine) {
-            if (line.endsWith(TASK_POSTFIX)) {
-                t = new TaskDeps(line.substr(0, line.length - TASK_POSTFIX.length));
+            var regMatch = line.match(/(\w+) - .+\.$/);
+            if (regMatch) {
+            t = new TaskDeps(regMatch[1]);
                 hitTaskStartLine = true;
                 tasks.push(t);
             }
@@ -189,6 +190,9 @@ function getFirstReleaseApkTaskDeps(tasks) {
     return tasks.find((t) => t.name.endsWith('eleaseApk'));
 }
 
+function getFirstCompileTaskDeps(tasks) {
+    return tasks.find((t) => t.name == 'compile')
+}
 function getFlattenedDeps(nodes, deps) {
     nodes
     // .filter((node) => !node.ommitted)

@@ -40,7 +40,7 @@
                 <td class="replaced">{{ dep.versionReplaced ? dep.originalVersion : '' }}</td>
                 <td class="dep-artiface">{{ dep.parent.artifact }}</td>
             </tr>
-            <tr>
+            <tr v-if="warn.length">
                 <td colspan="5">被替换版本的显式依赖列表</td>
             </tr>
             <tr v-for="w in warn">
