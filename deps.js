@@ -1,5 +1,4 @@
 var OMMITTED_POSTFIX = ' (*)';
-var TASK_POSTFIX = ' - ## Internal use, do not manually configure ##';
 
 
 class TaskDeps {
@@ -164,7 +163,7 @@ function getTaskDeps(depsContent) {
     lines.forEach((line) => {
         line = line.trim();
         if (!hitTaskStartLine) {
-            var regMatch = line.match(/(\w+) - .+\.$/);
+            var regMatch = line.match(/(\w+) - .+$/);
             if (regMatch) {
             t = new TaskDeps(regMatch[1]);
                 hitTaskStartLine = true;
