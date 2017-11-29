@@ -5,7 +5,8 @@
     <meta charset="utf-8">
     <link rel="stylesheet" type="text/css" href="deps.css">
     <script type="text/javascript" src="deps.js"></script>
-    <script type="text/javascript" src="vue.min.js"></script>
+    <!-- <script type="text/javascript" src="vue.min.js"></script> -->
+    <script src="https://cdn.bootcss.com/vue/2.5.9/vue.js"></script>
 </head>
 
 <body>
@@ -17,14 +18,19 @@
             </svg> <span>选择一个文件</span>
         </label>
         <input id="select-file2" type="file" value="select a deps file" />
-        <label class="file-label" for="select-file2">
+        <label style="display: none;" class="file-label" for="select-file2">
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="17" viewBox="0 0 20 17">
                 <path d="M10 0l-5.2 4.9h3.3v5.1h3.8v-5.1h3.3l-5.2-4.9zm9.3 11.5l-3.2-2.1h-2l3.4 2.6h-3.5c-.1 0-.2.1-.2.1l-.8 2.3h-6l-.8-2.2c-.1-.1-.1-.2-.2-.2h-3.6l3.4-2.6h-2l-3.2 2.1c-.4.3-.7 1-.6 1.5l.6 3.1c.1.5.7.9 1.2.9h16.3c.6 0 1.1-.4 1.3-.9l.6-3.1c.1-.5-.2-1.2-.7-1.5z"></path>
             </svg> <span>选择另一个文件</span>
         </label>
     </div>
     <div id="container">
-        <div class="deps-title" v-if="deps.length > 0">依赖列表</div>
+        <div class="deps-title" v-if="deps.length > 0">
+            <select v-if="tasks.length" v-on:change="selectTask">
+                <option v-for="task in tasks">{{task.name}}</option>
+            </select>
+            <span>依赖列表</span>
+        </div>
         <table v-if="deps.length > 0">
             <tr>
                 <th>group</th>
@@ -46,10 +52,9 @@
             <tr v-for="w in warn">
                 <td v-if="w.sameDepChains && w.sameDepChains.length > 0" colspan="5">
                     <div class="warn-dep">
-                        <div class="warn-title">被替换版本的依赖项：{{ w.group + ':' + w.artifact + ':' + w.originalVersion + ' -> ' + w.actualVersion }}</div>
+                        <div class="warn-title">被替换版本的依赖项：{{ w.group + ':' + w.artifact + ':' + w.originalVersion + ' -> ' + w.actualVersion + (!w.explicity ? '(多个间接依赖版本)' : '') }}</div>
                         <div>
-                            <span>其他依赖关系：</span>
-                            <ul class="dep-chain" v-for="chain in w.sameDepChains" v-bind:class="{'actual-upgrade': w != chain[0] && w.actualVersion == chain[0].originalVersion, 'auto-upgrade' : w.originalVersion != chain[0].originalVersion }">
+                            <ul class="dep-chain" v-for="chain in w.sameDepChains" v-bind:class="{'actual-upgrade': !w.explicity || (w != chain[0] && w.actualVersion == chain[0].originalVersion), 'auto-upgrade' : w.originalVersion != chain[0].originalVersion }">
                                 <li v-for="node in chain">
                                     {{ (node.group ? (node.group + ':') : '') + node.artifact + (node.originalVersion ? (':' + node.originalVersion) : '') }}
                                 </li>

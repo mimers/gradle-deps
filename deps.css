@@ -25,9 +25,9 @@ div.deps-title {
 }
 
 table {
-    margin: 0 28px;
+    padding: 0 28px;
     border-collapse: collapse;
-    /* width: 80%; */
+    width: 100%;
 }
 
 td {
@@ -170,4 +170,21 @@ label.file-label {
 
 label.file-label:hover {
     cursor: pointer;
+}
+
+
+option#task-selector {
+    display: inline-block;
+}
+
+select {
+    display: inline;
+}
+
+span {
+    vertical-align: middle;
+}
+
+.deps-title {
+    padding: 4px 0px;
 }

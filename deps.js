@@ -82,24 +82,6 @@ function DepNodeCompartor(a, b) {
     }
     return rst;
 
-    // if (a.explicity) {
-    //     if (!b.explicity) {
-    //         return 1;
-    //     }
-    // } else {
-    //     if (b.explicity) {
-    //         return -1;
-    //     }
-    // }
-    // if (a.group == b.group) {
-    //     if (a.artifact == b.artifact) {
-    //         return 0;
-    //     } else {
-    //         return a.artifact > b.artifact ? 1 : -1;
-    //     }
-    // } else {
-    //     return a.group > b.group ? 1 : -1;
-    // }
 }
 
 function uniqFilter(value, index, self) {
@@ -184,21 +166,15 @@ function getTaskDeps(depsContent) {
     return getDepHierachy(tasks, projectName);
 }
 
-
-function getFirstReleaseApkTaskDeps(tasks) {
-    return tasks.find((t) => t.name.endsWith('eleaseApk'));
-}
-
-function getFirstCompileTaskDeps(tasks) {
-    return tasks.find((t) => t.name == 'compile')
-}
 function getFlattenedDeps(nodes, deps) {
     nodes
     // .filter((node) => !node.ommitted)
     .forEach((node) => {
-
-        if (!deps.find((d) => node.equals(d))) {
+        var sameDepNode = deps.find((d) => node.equals(d));
+        if (!sameDepNode) {
             deps.push(node);
+        } else if (node.explicity) {
+            deps[deps.indexOf(sameDepNode)] = node;
         }
         if (node.children) {
             getFlattenedDeps(node.children, deps);
@@ -211,7 +187,8 @@ function findSameNodes(node, deps) {
     deps.forEach((dep) => {
         if (dep != node && dep.equalsIgnoreVersion(node)) {
             sameDeps.push(dep);
-        } else if (dep.children) {
+        }
+        if (dep.children) {
             sameDeps = sameDeps.concat(findSameNodes(node, dep.children));
         }
     });
@@ -223,9 +200,7 @@ function formatDeps(deps, task) {
         var imp = !dep.explicity;
         if (dep.versionReplaced || imp) {
             var sameNodes = findSameNodes(dep, task.deps);
-            if (imp) {
-                sameNodes.push(dep);
-            }
+            sameNodes.push(dep);
             dep.sameDepChains = sameNodes.map((node) => {
                 var chain = [node];
 
@@ -271,6 +246,7 @@ function getDepsList(task) {
     console.profileEnd(task.name);
 }
 
+var handledFileTasks = {};
 function handleFiles(files, secondFile) {
     for (var i = 0; i < files.length; i++) {
         var f = files[i];
@@ -279,8 +255,15 @@ function handleFiles(files, secondFile) {
             return function(e) {
                 console.profile(theFile.name);
                 var tasks = getTaskDeps(e.target.result);
-                var release = getFirstReleaseApkTaskDeps(tasks);
-                getDepsList(release);
+                vue.tasks = tasks.map(function (t) {
+                    return {
+                        name: t.name
+                    };
+                });
+                tasks.forEach(function (t) {
+                    handledFileTasks[t.name] = t;
+                });
+                getDepsList(tasks[0]);
                 console.profileEnd(theFile.name);
             }
         })(f);
@@ -320,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
         el: '#container',
         data: {
             deps: [],
+            tasks: [],
             showImp: true,
             dialogDep: false
         },
@@ -330,6 +314,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     this.dialogDep = curDep;
                 }
             },
+            selectTask: function (e) {
+                var task = e.currentTarget.value;
+                getDepsList(handledFileTasks[task]);
+            },
             closeDialog: function(e) {
                 if (!e.target.className.includes("fullscreen-modal-dialog")) {
                     return;
@@ -338,4 +326,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-})
+});
