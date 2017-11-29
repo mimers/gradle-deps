@@ -52,7 +52,7 @@
             <tr v-for="w in warn">
                 <td v-if="w.sameDepChains && w.sameDepChains.length > 0" colspan="5">
                     <div class="warn-dep">
-                        <div class="warn-title">被替换版本的依赖项：{{ w.group + ':' + w.artifact + ':' + w.originalVersion + ' -> ' + w.actualVersion + (!w.explicity ? '(多个间接依赖版本)' : '') }}</div>
+                        <div class="warn-title">{{(!w.explicity ? '多个间接依赖版本： ' : '被替换版本的依赖项： ') + w.group + ':' + w.artifact + ':' + (w.explicity ? w.originalVersion + ' -> ' : '') + w.actualVersion }}</div>
                         <div>
                             <ul class="dep-chain" v-for="chain in w.sameDepChains" v-bind:class="{'actual-upgrade': !w.explicity || (w != chain[0] && w.actualVersion == chain[0].originalVersion), 'auto-upgrade' : w.originalVersion != chain[0].originalVersion }">
                                 <li v-for="node in chain">
