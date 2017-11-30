@@ -147,7 +147,7 @@ function getTaskDeps(depsContent) {
         if (!hitTaskStartLine) {
             var regMatch = line.match(/(\w+) - .+$/);
             if (regMatch) {
-            t = new TaskDeps(regMatch[1]);
+                t = new TaskDeps(regMatch[1]);
                 hitTaskStartLine = true;
                 tasks.push(t);
             }
@@ -168,18 +168,18 @@ function getTaskDeps(depsContent) {
 
 function getFlattenedDeps(nodes, deps) {
     nodes
-    // .filter((node) => !node.ommitted)
-    .forEach((node) => {
-        var sameDepNode = deps.find((d) => node.equals(d));
-        if (!sameDepNode) {
-            deps.push(node);
-        } else if (node.explicity) {
-            deps[deps.indexOf(sameDepNode)] = node;
-        }
-        if (node.children) {
-            getFlattenedDeps(node.children, deps);
-        }
-    });
+        // .filter((node) => !node.ommitted)
+        .forEach((node) => {
+            var sameDepNode = deps.find((d) => node.equals(d));
+            if (!sameDepNode) {
+                deps.push(node);
+            } else if (node.explicity) {
+                deps[deps.indexOf(sameDepNode)] = node;
+            }
+            if (node.children) {
+                getFlattenedDeps(node.children, deps);
+            }
+        });
 }
 
 function findSameNodes(node, deps) {
@@ -236,87 +236,163 @@ function formatDeps(deps, task) {
     });
 }
 
-function getDepsList(task) {
-    var flattenedDeps = [];
-    console.profile(task.name);
-    getFlattenedDeps(task.deps, flattenedDeps);
-    flattenedDeps = formatDeps(flattenedDeps, task);
+function resovleDeps(task) {
+    if (!task.resovled) {
+        var flattenedDeps = [];
+        getFlattenedDeps(task.deps, flattenedDeps);
+        task.resovled = formatDeps(flattenedDeps, task);
+    }
+    return task.resovled;
+}
+
+function renderDepList(task) {
+    var flattenedDeps = resovleDeps(task);
     vue.warn = flattenedDeps.filter((n) => n.versionReplaced);
     vue.deps = flattenedDeps;
-    console.profileEnd(task.name);
+    vue.renderedTask = task;
 }
 
-var handledFileTasks = {};
-function handleFiles(files, secondFile) {
-    for (var i = 0; i < files.length; i++) {
-        var f = files[i];
-        var reader = new FileReader();
-        reader.onload = (function(theFile) {
-            return function(e) {
-                console.profile(theFile.name);
-                var tasks = getTaskDeps(e.target.result);
-                vue.tasks = tasks.map(function (t) {
-                    return {
-                        name: t.name
-                    };
+function semverComparator(a, b) {
+    var versionASegs = a.split(".").map(n => Number.parseInt(n));
+    var versionBSegs = b.split(".").map(n => Number.parseInt(n));
+    while (versionASegs.length && versionBSegs.length) {
+        var va = versionASegs.shift();
+        var vb = versionBSegs.shift();
+        if (va != vb) {
+            return va > vb ? 1 : -1;
+        }
+    }
+    return va.length > 0 ? 1 : (vb.length > 0 ? -1 : 0);
+}
+
+function renderDiff(aTask, bTask) {
+    if (!aTask || !bTask) {
+        alert('空task');
+        return;
+    }
+    var sameTaskName = aTask.name == bTask.name;
+    var aDeps = resovleDeps(aTask);
+    var bDeps = resovleDeps(bTask);
+    var unionDeps = [];
+    var addedDeps = bDeps.filter((dep) => {
+        return !aDeps.find(ait => {
+            var sameDep = dep.equalsIgnoreVersion(ait);
+            if (sameDep) {
+                unionDeps.push({
+                    a: ait,
+                    b: dep
                 });
-                tasks.forEach(function (t) {
-                    handledFileTasks[t.name] = t;
-                });
-                getDepsList(tasks[0]);
-                console.profileEnd(theFile.name);
             }
-        })(f);
-        reader.readAsText(f);
-        break;
-    };
+            return sameDep;
+        });
+    });
+    var removedDeps = aDeps.filter(dep => {
+        return !bDeps.find(bit => {
+            return dep.equalsIgnoreVersion(bit);
+        });
+    });
+    unionDeps = unionDeps.map(pair => {
+        var versionA = pair.a.actualVersion;
+        var versionB = pair.b.actualVersion;
+        var cmp = semverComparator(versionA, versionB);
+        if (cmp > 0) {
+            pair.downgradedVeresion = true;
+        } else if (cmp < 0) {
+            pair.upgradedVersion = true;
+        } else {
+            pair.sameVersion = true;
+        }
+        return pair;
+    });
+    vue.addedDeps = addedDeps;
+    vue.removedDeps = removedDeps;
+    vue.upgradedDeps = unionDeps.filter(d => d.upgradedVersion);
+    vue.downgradedDeps = unionDeps.filter(d => d.downgradedVeresion);
+    vue.showDepDiff = true;
 }
 
-function handleSelectFile(event) {
-    handleFiles(event.target.files);
+var firstRenderTasks = {},
+    secondDiffTasks = {};
+
+function handleFileContent(content, secondFile) {
+    var tasks = getTaskDeps(content);
+    if (!secondFile) {
+        vue.taskNameList = tasks.map(function(t) {
+            return {
+                name: t.name
+            };
+        });
+        firstRenderTasks = {};
+        tasks.forEach(function(t) {
+            firstRenderTasks[t.name] = t;
+        });
+        renderDepList(tasks[0]);
+        vue.firstFileDone = true;
+    } else {
+        var currentTask = vue.renderedTask;
+        tasks.forEach((t) => {
+            secondDiffTasks[t.name] = t;
+        });
+        vue.diffTaskNameList = vue.taskNameList.filter(tn => {
+            return tasks.find((t) => t.name == tn.name);
+        });
+        renderDiff(currentTask, secondDiffTasks[currentTask.name]);
+    }
 }
 
-function handleSelectFile2(event) {
-    handleFiles(event.target.files, true);
+
+function handleFiles(files, secondFile) {
+    var f = files[0];
+    var reader = new FileReader();
+    reader.onload = (function(theFile) {
+        return function(e) {
+            handleFileContent(e.target.result, secondFile);
+        }
+    })(f, secondFile);
+    reader.readAsText(f);
 }
 
-function handleDragOver(event) {
-    event.stopPropagation();
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy'; // Explicitly show this is a copy.
-}
-
-function handleDrop(event) {
-    event.stopPropagation();
-    event.preventDefault();
-    var files = event.dataTransfer.files;
-    handleFiles(files);
-}
-document.addEventListener('DOMContentLoaded', () => {
-    var select_file = document.getElementById('select-file');
-    select_file.addEventListener("change", handleSelectFile, false);
-    var select_file2 = document.getElementById('select-file2');
-    select_file2.addEventListener("change", handleSelectFile2, false);
-    document.body.addEventListener("drop", handleDrop, false);
-    document.body.addEventListener("dragover", handleDragOver, false);
+(function init() {
     vue = new Vue({
         el: '#container',
         data: {
             deps: [],
-            tasks: [],
+            taskNameList: [],
             showImp: true,
-            dialogDep: false
+            dialogDep: false,
+            firstFileDone: false,
+            renderedTask: null,
+            addedDeps: [],
+            removedDeps: [],
+            unionDeps: [],
+            showDepDiff: false
         },
         methods: {
+            handleSelectFile: function(e) {
+                handleFiles(e.target.files);
+            },
+            handleSelectFile2: function(e) {
+                handleFiles(e.target.files, true);
+            },
             expandDep: function(index) {
                 var curDep = this.deps[index];
                 if (!curDep.explicity || (curDep.sameDepChains && curDep.versionReplaced)) {
                     this.dialogDep = curDep;
                 }
             },
-            selectTask: function (e) {
+            selectDiffTask: function (e) {
                 var task = e.currentTarget.value;
-                getDepsList(handledFileTasks[task]);
+                renderDiff(firstRenderTasks[task], secondDiffTasks[task]);
+            },
+            selectTask: function(e) {
+                var task = e.currentTarget.value;
+                renderDepList(firstRenderTasks[task]);
+            },
+            closeDiffDialog: function(e) {
+                if (!e.target.className.includes("fullscreen-modal-dialog")) {
+                    return;
+                }
+                this.showDepDiff = false;
             },
             closeDialog: function(e) {
                 if (!e.target.className.includes("fullscreen-modal-dialog")) {
@@ -326,4 +402,4 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-});
+})();

@@ -188,3 +188,7 @@ span {
 .deps-title {
     padding: 4px 0px;
 }
+
+content.diff-dialog {
+    padding: 8px;
+}
