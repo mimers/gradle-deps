@@ -309,14 +309,16 @@ function renderDiff(aTask, bTask) {
     vue.upgradedDeps = unionDeps.filter(d => d.upgradedVersion);
     vue.downgradedDeps = unionDeps.filter(d => d.downgradedVeresion);
     vue.showDepDiff = true;
+    vue.renderedDiffTaskName = aTask.name;
 }
 
 var firstRenderTasks = {},
     secondDiffTasks = {};
 
-function handleFileContent(content, secondFile) {
+function handleFileContent(name, content, secondFile) {
     var tasks = getTaskDeps(content);
     if (!secondFile) {
+        vue.firstFileName = name;
         vue.taskNameList = tasks.map(function(t) {
             return {
                 name: t.name
@@ -326,9 +328,13 @@ function handleFileContent(content, secondFile) {
         tasks.forEach(function(t) {
             firstRenderTasks[t.name] = t;
         });
-        renderDepList(tasks[0]);
+        var compileTask = tasks.find(t => t.name == 'compile') || tasks[0];
+        vue.renderedTaskName = compileTask.name;
+        renderDepList(compileTask);
         vue.firstFileDone = true;
+        document.title = name + " | Fancy Gradle Deps"
     } else {
+        vue.secondFileName = name;
         var currentTask = vue.renderedTask;
         tasks.forEach((t) => {
             secondDiffTasks[t.name] = t;
@@ -344,9 +350,9 @@ function handleFileContent(content, secondFile) {
 function handleFiles(files, secondFile) {
     var f = files[0];
     var reader = new FileReader();
-    reader.onload = (function(theFile) {
+    reader.onload = (function(theFile, secondFile) {
         return function(e) {
-            handleFileContent(e.target.result, secondFile);
+            handleFileContent(theFile.name, e.target.result, secondFile);
         }
     })(f, secondFile);
     reader.readAsText(f);
@@ -365,14 +371,20 @@ function handleFiles(files, secondFile) {
             addedDeps: [],
             removedDeps: [],
             unionDeps: [],
-            showDepDiff: false
+            showDepDiff: false,
+            firstFileName: '',
+            secondFileName: '',
+            renderedTaskName: '',
+            renderedDiffTaskName: ''
         },
         methods: {
             handleSelectFile: function(e) {
                 handleFiles(e.target.files);
+                e.target.value = '';
             },
             handleSelectFile2: function(e) {
                 handleFiles(e.target.files, true);
+                e.target.value = '';
             },
             expandDep: function(index) {
                 var curDep = this.deps[index];

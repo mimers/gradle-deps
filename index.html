@@ -25,7 +25,8 @@
             </label>
         </div>
         <div class="deps-title" v-if="deps.length > 0">
-            <select v-if="taskNameList.length" v-on:change="selectTask">
+            <span> {{firstFileName}} </span>
+            <select v-if="taskNameList.length" v-model="renderedTaskName" v-on:change="selectTask">
                 <option v-for="task in taskNameList">{{task.name}}</option>
             </select>
             <span>依赖列表</span>
@@ -83,7 +84,8 @@
         <transition name="slide-fade">
             <div v-on:click="closeDiffDialog" class="fullscreen-modal-dialog" v-if="showDepDiff">
                 <content class="diff-dialog">
-                    <select v-if="taskNameList.length" v-on:change="selectDiffTask">
+                    <span>{{ firstFileName }} ---> {{ secondFileName }}</span>
+                    <select v-if="taskNameList.length" v-model="renderedDiffTaskName" v-on:change="selectDiffTask">
                         <option v-for="task in diffTaskNameList">{{task.name}}</option>
                     </select>
                     <div v-if="addedDeps.length">
