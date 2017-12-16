@@ -143,7 +143,7 @@ function getTaskDeps(depsContent) {
         projectName = projectLine.substr('Project :'.length);
     }
     lines.forEach((line) => {
-        line = line.trim();
+        line = line.replace('\r', '');
         if (!hitTaskStartLine) {
             var regMatch = line.match(/(\w+) - .+$/);
             if (regMatch) {
@@ -196,7 +196,9 @@ function findSameNodes(node, deps) {
 }
 
 function formatDeps(deps, task) {
-    return deps.filter((dep) => !dep.isLibraryModule).sort(DepNodeCompartor).map((dep) => {
+    return deps
+        .filter((dep) => !dep.isLibraryModule)
+        .sort(DepNodeCompartor).map((dep) => {
         var imp = !dep.explicity;
         if (dep.versionReplaced || imp) {
             var sameNodes = findSameNodes(dep, task.deps);
