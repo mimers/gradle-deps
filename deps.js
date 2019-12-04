@@ -330,7 +330,7 @@ function handleFileContent(name, content, secondFile) {
         tasks.forEach(function(t) {
             firstRenderTasks[t.name] = t;
         });
-        var compileTask = tasks.find(t => t.name == 'compile') || tasks[0];
+        var compileTask = tasks.find(t => t.deps.length) || tasks[0];
         vue.renderedTaskName = compileTask.name;
         renderDepList(compileTask);
         vue.firstFileDone = true;
