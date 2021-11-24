@@ -244,7 +244,7 @@ function resovleDeps(task) {
         getFlattenedDeps(task.deps, flattenedDeps);
         task.resovled = formatDeps(flattenedDeps, task);
     }
-    return task.resovled;
+    return task.resovled.filter(d => d.artifact);
 }
 
 function renderDepList(task) {
